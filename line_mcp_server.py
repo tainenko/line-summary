@@ -7,6 +7,7 @@ import glob
 import json
 import os
 import re
+import sys
 import threading
 from datetime import datetime, timezone
 from types import MappingProxyType
@@ -40,10 +41,26 @@ _lock = threading.RLock()
 _EXCLUDE_PREFIXES = ("album_", "keep_", "chatStats_")
 
 
+def _default_data_dir() -> str | None:
+    """Per-platform default LINE PC local DB directory, for discovery only."""
+    if sys.platform == "win32":
+        return os.path.join(os.path.expandvars("%LOCALAPPDATA%"), "LINE", "Data", "db")
+    if sys.platform == "darwin":
+        # LINE.app is sandboxed; its container nests a second, app-group
+        # container holding the actual .edb files.
+        return os.path.expanduser(
+            "~/Library/Containers/jp.naver.line.mac/Data/Library/Containers/"
+            "jp.naver.line/Data/db"
+        )
+    return None
+
+
 def _find_edb_path(data_dir: str | None = None) -> str | None:
     """Legacy helper; server startup now requires an explicit account DB path."""
     if data_dir is None:
-        data_dir = os.path.join(os.path.expandvars("%LOCALAPPDATA%"), "LINE", "Data", "db")
+        data_dir = _default_data_dir()
+    if data_dir is None:
+        return None
     candidates = [p for p in glob.glob(os.path.join(data_dir, "*.edb"))
                   if not os.path.basename(p).startswith(_EXCLUDE_PREFIXES)]
     return max(candidates, key=os.path.getsize) if candidates else None

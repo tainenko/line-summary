@@ -6,9 +6,13 @@ description: Summarize authorized LINE PC local chat history or approximate unre
 # LINE summary
 
 Use the `line` MCP tools for the user's named chats and requested time range.
-LINE PC must be running on Windows and the local server must already be enabled
-and scoped by the user. Project registration lives in `.mcp.json`; this project
-skill lives in `.claude/skills/line-summary/SKILL.md`.
+LINE PC must be running (Windows or macOS) and the local server must already
+be enabled and scoped by the user. On macOS, the user must also have exported
+`LINE_DB_KEY` in the shell that started Claude Code (see README.md's macOS
+section); if history/unread calls fail with a key-related error, tell the user
+to re-run `tools/mac_extract_key.py` rather than retrying automatically.
+Project registration lives in `.mcp.json`; this project skill lives in
+`.claude/skills/line-summary/SKILL.md`.
 
 ## Data and permission boundaries
 

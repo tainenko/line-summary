@@ -1,5 +1,53 @@
 # Changelog
 
+## 2026-10-08 — macOS support
+
+### Added
+
+- `key_extractor_mac.py`: validates/relays a key already extracted
+  out-of-process, via the `LINE_DB_KEY` environment variable. Never scans
+  process memory or needs elevated privileges itself.
+- `tools/mac_extract_key.py`: standalone, manually-run (`sudo`) CLI that scans
+  LINE's process memory on macOS via `task_for_pid`/`mach_vm_read` (the mach
+  equivalent of Windows' `ReadProcessMemory`) and prints the decrypted key to
+  the terminal only. Not imported by the server; requires LINE.app to be
+  ad-hoc re-signed first (drops Hardened Runtime) — see README.md's macOS
+  section.
+- `key_extractor_windows.py`: the original Windows memory-scanning module,
+  renamed (no behavior change) so `key_extractor.py` could become a thin
+  per-platform dispatcher.
+- macOS default `.edb` discovery path
+  (`~/Library/Containers/jp.naver.line.mac/.../Data/db`) in
+  `line_mcp_server._default_data_dir()`.
+- `macos-14` added to the offline-tests CI matrix.
+
+### Why the macOS key flow differs from Windows
+
+Windows allows a same-user, non-elevated process to read another process'
+memory. macOS refuses that against a Hardened Runtime app (LINE.app ships with
+it enabled) unless the target is ad-hoc re-signed and the caller runs as root.
+Running the long-lived, unprivileged MCP server as root just for this was
+judged a larger privilege expansion than acceptable, so the memory scan was
+moved into a separate, manually-run, short-lived script
+(`tools/mac_extract_key.py`), and the key crosses into the server process via
+an environment variable the user exports in the same shell — never written to
+disk, settings.json, or the macOS Keychain. This means macOS requires a fresh
+manual extraction every time that shell/session starts, which Windows does
+not. See README.md's "macOS 專屬設定" section for the exact steps.
+
+### Verification
+
+- Full offline test suite (129 tests, `-m "not integration"`) passes
+  unmodified on macOS (Python 3.13, arm64); coverage 89.77%, above the 85%
+  threshold.
+- `tools/mac_extract_key.py`'s non-root guard, `find_line_pid()`, and its mach
+  ctypes bindings were smoke-tested on a real Mac without LINE running (no
+  LINE process found → correctly returns `None`; mach function pointers
+  resolve). The actual `task_for_pid`/`mach_vm_read` scan against a live,
+  ad-hoc re-signed LINE.app was **not** run — that requires `sudo` and a
+  consequential, hard-to-reverse change to the user's installed LINE.app, so
+  it was left for the user to run and verify themselves.
+
 ## 2026-10-08 — Core safety repair (breaking API)
 
 Based on `bd3569e80af56cff342cab9690e6a6d0cb2f4f93`.

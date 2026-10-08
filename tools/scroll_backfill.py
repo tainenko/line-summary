@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 from line_mcp_server import _find_edb_path  # noqa: E402
-from key_extractor import extract_key, find_line_pid  # noqa: E402
+from key_extractor_windows import extract_key, find_line_pid  # noqa: E402
 from db_reader import _open_encrypted, _ts_to_iso  # noqa: E402
 
 import uiautomation as auto  # noqa: E402

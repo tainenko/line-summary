@@ -1,6 +1,8 @@
 # line-summary
 
-用 Claude Code 讀取本機 LINE 電腦版已儲存的聊天記錄，整理指定聊天室與時間範圍的摘要。適用於 Windows；不是完整聊天備份，也不能證明 LINE 雲端訊息已全部同步。
+用 Claude Code 讀取本機 LINE 電腦版已儲存的聊天記錄，整理指定聊天室與時間範圍的摘要。支援 Windows 與 macOS；不是完整聊天備份，也不能證明 LINE 雲端訊息已全部同步。
+
+兩個平台的金鑰取得方式不同（見下方「需要什麼」與「macOS 專屬設定」），其餘工具行為一致。
 
 ## 先了解資料會去哪裡
 
@@ -19,15 +21,19 @@ LINE 程序記憶體 → 本機金鑰提取 → 以唯讀模式解密本機 LINE
 
 ## 需要什麼
 
-- Windows，以及正在執行、已登入的 LINE 電腦版。讀取 LINE 程序記憶體使用 Windows API。
+- Windows 或 macOS，以及正在執行、已登入的 LINE 電腦版。
+  - Windows：讀取 LINE 程序記憶體使用 Windows API（`key_extractor_windows.py`），MCP server 以一般使用者權限執行即可，不需要系統管理員。
+  - macOS：LINE.app 預設受 Apple Hardened Runtime 保護，一般權限的 MCP server **無法**也**不會**自行讀取它的程序記憶體。金鑰改由你手動執行一次性的 `tools/mac_extract_key.py`（需要 `sudo`）取得，詳見下方「macOS 專屬設定」。這是兩平台在金鑰取得上唯一的行為差異，其餘工具（分頁、額度、權限設定）完全相同。
 - Python 3.11 以上與 Claude Code。
-- 對本機資料庫的讀取權限，以及可用的 SQLite3MultipleCiphers 引擎。
+- 對本機資料庫的讀取權限，以及可用的 SQLite3MultipleCiphers 引擎（`apsw-sqlite3mc`，Windows/macOS/Linux 皆有對應 wheel）。
 
-原專案曾在 LINE 電腦版 26.3（wxSQLite3 aes128cbc）上測試。LINE 更新後可能需要重新驗證；本次安全修補沒有執行 Windows／真實帳號整合測試。
+原專案曾在 LINE 電腦版 26.3（wxSQLite3 aes128cbc）上測試。LINE 更新後可能需要重新驗證；本次修補沒有執行 Windows／macOS 真實帳號整合測試。
 
 ## 安裝
 
-建議使用獨立虛擬環境，在一般使用者權限的 PowerShell 執行：
+建議使用獨立虛擬環境。
+
+**Windows**（一般使用者權限的 PowerShell）：
 
 ```powershell
 git clone https://github.com/yung13yubabie/line-summary.git
@@ -36,9 +42,51 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --require-hashes --only-binary=:all: -r requirements.txt
 ```
 
-Runtime 相依套件含版本與 hash 鎖定；若目前 Python／Windows 組合沒有對應 wheel，安裝會停止，請先確認支援情況，不要直接關閉 hash 檢查或改從未審閱來源建置。這次修補未驗證 Windows binary 相容性。
+**macOS**（一般使用者權限的終端機；金鑰擷取那一步才需要 `sudo`，見下方）：
 
-將專案 `.mcp.json` 的 `command` 改為這個虛擬環境 Python 的絕對路徑；全域註冊時，Python 與 server 都使用絕對路徑。不要因讀取失敗就直接改用系統管理員權限。
+```bash
+git clone https://github.com/yung13yubabie/line-summary.git
+cd line-summary
+python3 -m venv .venv
+.venv/bin/python3 -m pip install --require-hashes --only-binary=:all: -r requirements.txt
+```
+
+Runtime 相依套件含版本與 hash 鎖定；若目前 Python／平台組合沒有對應 wheel，安裝會停止，請先確認支援情況，不要直接關閉 hash 檢查或改從未審閱來源建置。這次修補未驗證 Windows／macOS binary 相容性。
+
+將專案 `.mcp.json` 的 `command` 改為這個虛擬環境 Python 的絕對路徑；全域註冊時，Python 與 server 都使用絕對路徑。不要因讀取失敗就直接改用系統管理員權限——macOS 上唯一需要 `sudo` 的步驟是獨立執行的 `tools/mac_extract_key.py`，常駐的 MCP server 本身永遠以一般使用者權限執行。
+
+## macOS 專屬設定：金鑰取得
+
+macOS 不允許一般程序讀取別的 Hardened Runtime app 的記憶體，所以金鑰取得被拆成「你手動執行一次」跟「MCP server 平時讀取環境變數」兩步，和 Windows 版（server 自己在同一個程序內掃描記憶體）不同。詳見 [`key_extractor_mac.py`](key_extractor_mac.py) 檔頭說明。
+
+1. **對本機 LINE.app 做 ad-hoc 重新簽署**（一次性，LINE 更新後要重做；這會移除 LINE 官方簽署，macOS Gatekeeper 將不再為它背書，風險自行評估）：
+
+   ```bash
+   cp -R /Applications/LINE.app ~/Desktop/LINE.app.backup   # 建議先備份
+   sudo codesign --remove-signature /Applications/LINE.app
+   sudo codesign --force --deep --sign - /Applications/LINE.app
+   ```
+
+2. 確認 LINE 電腦版正在執行並已登入，再找到你帳號的 `.edb` 路徑（通常在 `~/Library/Containers/jp.naver.line.mac/Data/Library/Containers/jp.naver.line/Data/db/`，排除 `album_`、`keep_`、`chatStats_` 開頭的檔案）。
+
+3. 在終端機以 `sudo` 執行一次性擷取工具（務必用虛擬環境的 Python，才能載入 `apsw`）：
+
+   ```bash
+   sudo .venv/bin/python3 tools/mac_extract_key.py --db-path /絕對路徑/你的帳號.edb
+   ```
+
+   成功後金鑰只會印在**這個終端機視窗**一次，不會寫入任何檔案、log 或工具回傳值。
+
+4. 複製印出的金鑰，在**同一個終端機工作階段**匯出環境變數，再從這個 shell 啟動 Claude Code（讓它繼承這個環境變數）：
+
+   ```bash
+   export LINE_DB_KEY=剛剛印出的金鑰
+   claude   # 從這個 shell 啟動，MCP server 才能讀到 LINE_DB_KEY
+   ```
+
+   這個環境變數只存在於這個終端機工作階段；關掉終端機或開新視窗就會消失，下次要用得重跑第 3、4 步。這是刻意的設計：金鑰不落地到任何設定檔或 Keychain，代價是每個工作階段都要手動重新擷取一次。
+
+5. 若之後要重跑第 3 步，LINE 必須仍在執行；若金鑰驗證失敗（通常是 LINE 更新後金鑰輪替），重新執行第 3 步即可。
 
 ## 先設定最小資料範圍
 

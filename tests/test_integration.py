@@ -24,8 +24,8 @@ def live(request):
         pytest.skip("live LINE access requires --run-live-line")
 
     import sys
-    if sys.platform != "win32":
-        pytest.skip("live LINE integration requires Windows")
+    if sys.platform not in ("win32", "darwin"):
+        pytest.skip("live LINE integration requires Windows or macOS")
 
     from key_extractor import find_line_pid, extract_key
     from line_mcp_server import _find_edb_path

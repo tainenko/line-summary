@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 import pytest
-from key_extractor import find_line_pid, validate_key_format, _scan_memory_regions
+from key_extractor_windows import find_line_pid, validate_key_format, _scan_memory_regions
 
 
 def test_find_line_pid_returns_none_when_not_running():

@@ -180,41 +180,41 @@ def test_get_reader_raises_when_key_declined(monkeypatch):
     srv._reader = None
 
 
-# --- key_extractor: consent, pid parse error, extract_key orchestration ----
+# --- key_extractor_windows: consent, pid parse error, extract_key orchestration ----
 def test_confirm_user_consent_yes(capsys):
-    import key_extractor as ke
+    import key_extractor_windows as ke
     with patch("builtins.input", return_value="yes"):
         assert ke.confirm_user_consent() is True
 
 
 def test_confirm_user_consent_no():
-    import key_extractor as ke
+    import key_extractor_windows as ke
     with patch("builtins.input", return_value="nope"):
         assert ke.confirm_user_consent() is False
 
 
 def test_find_line_pid_non_integer_field_returns_none():
-    import key_extractor as ke
+    import key_extractor_windows as ke
     with patch("subprocess.run") as m:
         m.return_value = MagicMock(stdout='"LINE.exe","notapid","Console"\n')
         assert ke.find_line_pid() is None
 
 
 def test_extract_key_consent_declined_returns_none():
-    import key_extractor as ke
+    import key_extractor_windows as ke
     with patch.object(ke, "confirm_user_consent", return_value=False):
         assert ke.extract_key("x.edb", require_consent=True) is None
 
 
 def test_extract_key_raises_when_line_not_running():
-    import key_extractor as ke
+    import key_extractor_windows as ke
     with patch.object(ke, "find_line_pid", return_value=None):
         with pytest.raises(RuntimeError, match="not running"):
             ke.extract_key("x.edb", require_consent=False)
 
 
 def test_extract_key_raises_when_no_candidates():
-    import key_extractor as ke
+    import key_extractor_windows as ke
     with patch.object(ke, "find_line_pid", return_value=123), \
          patch("db_reader.preflight_db_access"), \
          patch.object(ke, "_scan_memory_regions", return_value=[]):
@@ -223,7 +223,7 @@ def test_extract_key_raises_when_no_candidates():
 
 
 def test_extract_key_returns_first_matching_candidate():
-    import key_extractor as ke
+    import key_extractor_windows as ke
     with patch.object(ke, "find_line_pid", return_value=123), \
          patch("db_reader.preflight_db_access"), \
          patch.object(ke, "_scan_memory_regions", return_value=["a" * 32, "b" * 32]), \
@@ -232,7 +232,7 @@ def test_extract_key_returns_first_matching_candidate():
 
 
 def test_extract_key_raises_when_no_candidate_decrypts():
-    import key_extractor as ke
+    import key_extractor_windows as ke
     with patch.object(ke, "find_line_pid", return_value=123), \
          patch("db_reader.preflight_db_access"), \
          patch.object(ke, "_scan_memory_regions", return_value=["a" * 32]), \
@@ -299,7 +299,7 @@ def test_preflight_ok_when_dummy_key_opens(tmp_path):
 
 
 def test_extract_key_reports_access_error_not_wrong_key():
-    import key_extractor as ke
+    import key_extractor_windows as ke
     import db_reader
     with patch.object(ke, "find_line_pid", return_value=123), \
          patch.object(db_reader, "preflight_db_access",
